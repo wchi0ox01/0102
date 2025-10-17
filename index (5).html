@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ลงทะเบียนนักเรียน</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Custom styles -->
+    <style>
+        body { font-family: 'Inter', 'Kanit', sans-serif; }
+        .loader { border-top-color: #3b82f6; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md">
+        <header class="flex items-center justify-between mb-6">
+            <div class="flex items-center space-x-3">
+                <i data-lucide="user-plus" class="text-blue-600 w-6 h-6"></i>
+                <h1 class="text-xl font-bold">ลงทะเบียนนักเรียนใหม่</h1>
+            </div>
+            <button onclick="toggleTheme()" type="button" class="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm p-2.5">
+                <i data-lucide="sun" id="theme-icon-sun" class="hidden w-5 h-5"></i>
+                <i data-lucide="moon" id="theme-icon-moon" class="w-5 h-5"></i>
+            </button>
+        </header>
+
+        <div id="alert" class="p-3 rounded-lg text-sm mb-4 hidden" role="alert"></div>
+
+        <form id="registrationForm" class="space-y-4">
+            <div>
+                <label for="studentId" class="block text-sm font-medium text-gray-700 dark:text-gray-300">รหัสประจำตัวนักศึกษา <span class="text-red-500">*</span></label>
+                <input type="text" id="studentId" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2">
+            </div>
+            <div>
+                <label for="studentName" class="block text-sm font-medium text-gray-700 dark:text-gray-300">ชื่อ-สกุล <span class="text-red-500">*</span></label>
+                <input type="text" id="studentName" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2">
+            </div>
+            <div>
+                <label for="studentClass" class="block text-sm font-medium text-gray-700 dark:text-gray-300">ชั้นเรียน <span class="text-red-500">*</span></label>
+                <input type="text" id="studentClass" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2">
+            </div>
+            
+            <div class="text-center">
+                <button type="submit" class="w-full flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <i data-lucide="save" class="w-5 h-5 mr-2"></i> บันทึกข้อมูล
+                </button>
+            </div>
+            
+            <div class="text-center text-sm text-gray-600 dark:text-gray-400">
+                <p>หมายเหตุ: การสแกนใบหน้าจะทำในหน้าเช็คชื่อ</p>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let gasWebAppUrl = localStorage.getItem('gasWebAppUrl') || '';
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (!gasWebAppUrl) {
+                showAlert('alert', 'กรุณาตั้งค่า Google Apps Script URL ในหน้า Admin ก่อนใช้งาน', 'error');
+                return;
+            }
+            
+            // Check if already registered
+            const registeredStudentId = localStorage.getItem('registeredStudentId');
+            if (registeredStudentId) {
+                showAlert('alert', 'คุณได้ลงทะเบียนแล้ว กำลังนำไปยังหน้าเช็คชื่อ...', 'info');
+                setTimeout(() => {
+                    window.location.href = 'checkin.html';
+                }, 2000);
+                return;
+            }
+
+            // Apply saved theme
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            applyTheme(savedTheme);
+        });
+
+        document.getElementById('registrationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const studentId = document.getElementById('studentId').value;
+            const studentName = document.getElementById('studentName').value;
+            const studentClass = document.getElementById('studentClass').value;
+
+            showAlert('alert', 'กำลังบันทึกข้อมูล...', 'info');
+            
+            // Disable form
+            const submitBtn = document.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+
+            try {
+                const response = await apiCall({
+                    action: 'addStudent',
+                    data: {
+                        id: studentId,
+                        name: studentName,
+                        class: studentClass,
+                        imageData: '' // Will be added later during face registration
+                    }
+                });
+
+                if (response.success) {
+                    showAlert('alert', 'ลงทะเบียนสำเร็จ! กำลังนำไปยังหน้าเช็คชื่อ...', 'success');
+                    localStorage.setItem('registeredStudentId', studentId);
+                    localStorage.setItem('registeredStudentName', studentName);
+                    localStorage.setItem('registeredStudentClass', studentClass);
+                    setTimeout(() => {
+                        window.location.href = 'checkin.html';
+                    }, 2000);
+                } else {
+                    showAlert('alert', 'ลงทะเบียนไม่สำเร็จ: ' + response.error, 'error');
+                    submitBtn.disabled = false;
+                }
+            } catch (error) {
+                showAlert('alert', 'เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + error.message, 'error');
+                submitBtn.disabled = false;
+            }
+        });
+
+        function showAlert(elementId, message, type) {
+            const alertDiv = document.getElementById(elementId);
+            alertDiv.textContent = message;
+            alertDiv.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-blue-100', 'text-blue-800');
+            if (type === 'success') {
+                alertDiv.classList.add('bg-green-100', 'text-green-800');
+            } else if (type === 'error') {
+                alertDiv.classList.add('bg-red-100', 'text-red-800');
+            } else if (type === 'info') {
+                alertDiv.classList.add('bg-blue-100', 'text-blue-800');
+            }
+            alertDiv.classList.remove('hidden');
+            setTimeout(() => { alertDiv.classList.add('hidden'); }, 5000);
+        }
+
+        async function apiCall(payload) {
+            if (!gasWebAppUrl) {
+                throw new Error('GAS URL not configured');
+            }
+            try {
+                const response = await fetch(gasWebAppUrl, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('API Call Error:', error);
+                throw error;
+            }
+        }
+
+        // Theme functions
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                document.getElementById('theme-icon-sun').classList.remove('hidden');
+                document.getElementById('theme-icon-moon').classList.add('hidden');
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('theme-icon-sun').classList.add('hidden');
+                document.getElementById('theme-icon-moon').classList.remove('hidden');
+            }
+            lucide.createIcons();
+        }
+
+        function toggleTheme() {
+            const newTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+            localStorage.setItem('theme', newTheme);
+            applyTheme(newTheme);
+        }
+    </script>
+</body>
+</html>
